@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html>
+  <body>
+    <form id="login-form" method="post" novalidate>
+      {% csrf_token %}
+      <p>
+        <label
+          >Username:<br />
+          <input type="text" name="username" required
+        /></label>
+      </p>
+      <p>
+        <label
+          >Password:<br />
+          <input type="password" name="password" required
+        /></label>
+      </p>
+      <button type="submit">Login</button>
+    </form>
+    <br />
+    <p>New user? <a href="{% url 'signup' %}">Sign up</a></p>
+    <script>
+      document
+        .getElementById("login-form")
+        .addEventListener("submit", async (e) => {
+          e.preventDefault();
+          const form = e.target;
+          const data = new FormData(form);
+          const payload = {
+            username: data.get("username"),
+            password: data.get("password"),
+          };
+
+          try {
+            const res = await fetch("{% url 'login' %}", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                "X-CSRFToken": "{{ csrf_token }}",
+              },
+              body: JSON.stringify(payload),
+            });
+
+            if (!res.ok) {
+              const err = await res.json();
+              alert("Login failed: " + (err.detail || JSON.stringify(err)));
+              return;
+            }
+
+            await res
+              .json()
+              .then((data) => {
+                localStorage.setItem("access", data.access_token);
+                localStorage.setItem("refresh", data.refresh_token);
+                localStorage.setItem("user_id", data.user.id);
+                localStorage.setItem("email", data.user.email);
+                localStorage.setItem("first_name", data.user.first_name);
+                localStorage.setItem("last_name", data.user.last_name);
+                localStorage.setItem("isAuthenticated", "true");
+
+                window.location.href = "{% url 'chat_list' %}";
+              })
+              .catch((LoginError) => {
+                console.log("LoginError", LoginError);
+              });
+          } catch (err) {
+            console.error(err);
+            alert("Something went wrong. Please try again.");
+          }
+        });
+    </script>
+  </body>
+</html>

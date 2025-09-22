@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html>
+  <body class="container" style="padding: 20px; display: flex flex-column">
+    <h1 id="id_hello_message">
+      Hello {{ first_name }} {{ last_name }} ! welcome to your chat Application
+    </h1>
+    <button
+      class="btn btn-danger"
+      style="margin-left: auto"
+      id="id_logout_button"
+    >
+      Logout
+    </button>
+    <h2>Your Conversations</h2>
+    <ul class="list-group mb-3" id="conversationList">
+      {% for conv in conversations %} {% empty %}
+      <li class="list-group-item" id="noConversations">
+        No conversations yet.
+      </li>
+      {% endfor %}
+    </ul>
+
+    <div
+      class="modal fade"
+      id="createConvModal"
+      tabindex="-1"
+      aria-hidden="true"
+    >
+      <div class="modal-dialog">
+        <form
+          id="createConvForm"
+          method="post"
+          action="{% url 'api_create_conv' %}"
+        >
+          {% csrf_token %}
+          <div class="modal-content">
+            <div class="modal-header">
+              <h5 class="modal-title">New Conversation</h5>
+            </div>
+            <div class="modal-body d-flex flex-column gap-4 p-2">
+              <div class="d-flex flex-column p-2">
+                <label>Title:</label>
+                <input
+                  type="text"
+                  name="title"
+                  class="form-control"
+                  placeholder="Title (optional)"
+                />
+              </div>
+              <div class="d-flex flex-column p-2">
+                <label
+                  >Conversation Participants (comma separated emails):</label
+                >
+                <select
+                  name="conversation_participants"
+                  id="id_conversation_participants"
+                  class="form-control"
+                  multiple
+                >
+                  <option value="">Select Conversation Participants</option>
+                  {% for user in all_users %}
+                  <option value="{{ user.email }}">
+                    {{ user.email }} - {{ user.first_name }} {{ user.last_name
+                    }}
+                  </option>
+                  {% endfor %}
+                </select>
+              </div>
+            </div>
+            <div class="modal-footer gap-2 p-2">
+              <button type="submit" class="btn btn-primary">Create</button>
+            </div>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <script>
+      const isAuthenticated =
+        localStorage.getItem("isAuthenticated") === "true";
+      if (!isAuthenticated) {
+        window.location.href = "{% url 'home' %}";
+      }
+      const user_id = localStorage.getItem("user_id");
+      const first_name = localStorage.getItem("first_name");
+      const last_name = localStorage.getItem("last_name");
+      const helloMessage = document.getElementById("id_hello_message");
+      helloMessage.textContent =
+        "Hello " +
+        first_name +
+        " " +
+        last_name +
+        " ! welcome to your chat Application";
+
+      const createConvForm = document.getElementById("createConvForm");
+      createConvForm.onsubmit = function (e) {
+        e.preventDefault();
+        const form = e.target;
+        const data = new FormData(form);
+
+        const payload = {
+          title: data.get("title"),
+          conversation_participants: data
+            .getAll("conversation_participants")
+            .join(","),
+          user_id: parseInt(user_id),
+        };
+
+        fetch("{% url 'api_create_conv' %}", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-CSRFToken": "{{ csrf_token }}",
+          },
+          body: JSON.stringify(payload),
+        })
+          .then((response) => response.json())
+          .then((data) => {
+            window.location.href =
+              "{% url 'conversation' conversation_id=0 %}".replace(
+                "/0/",
+                "/" + data.id + "/"
+              );
+          });
+      };
+
+      fetch("{% url 'api_get_all_users' %}", {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+          "X-CSRFToken": "{{ csrf_token }}",
+          Authorization: "Bearer " + localStorage.getItem("access_token"),
+        },
+      })
+        .then(async (AllUsersResponse) => {
+          await AllUsersResponse.json()
+            .then((allUsers) => {
+              const conversationParticipantsInput = document.getElementById(
+                "id_conversation_participants"
+              );
+              allUsers.forEach((user) => {
+                if (user.id !== parseInt(user_id)) {
+                  const option = document.createElement("option");
+                  option.value = user.email;
+                  option.textContent =
+                    user.email + " - " + user.first_name + " " + user.last_name;
+                  conversationParticipantsInput.appendChild(option);
+                }
+              });
+            })
+            .catch((AllUsersError) => {
+              console.log("AllUsersError", AllUsersError);
+            });
+        })
+        .catch((AllUsersError) => {
+          console.log("AllUsersError", AllUsersError);
+        });
+
+      const logoutButton = document.getElementById("id_logout_button");
+      logoutButton.onclick = function (e) {
+        e.preventDefault();
+        fetch("{% url 'logout-user' %}", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-CSRFToken": "{{ csrf_token }}",
+          },
+          body: JSON.stringify({
+            user_id: user_id,
+          }),
+        });
+        window.location.href = "{% url 'home' %}";
+        localStorage.removeItem("isAuthenticated");
+        localStorage.removeItem("user_id");
+        localStorage.removeItem("first_name");
+        localStorage.removeItem("last_name");
+        localStorage.removeItem("email");
+        localStorage.removeItem("refresh_token");
+        localStorage.removeItem("access_token");
+      };
+
+      fetch("{% url 'api_conversations' %}", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-CSRFToken": "{{ csrf_token }}",
+        },
+        body: JSON.stringify({
+          user_id: user_id,
+        }),
+      })
+        .then((ConversationsResponse) => ConversationsResponse.json())
+        .then((ConversationsData) => {
+          const noConversations = document.getElementById("noConversations");
+          if (ConversationsData.length === 0) {
+            noConversations.style.display = "block";
+          } else {
+            noConversations.style.display = "none";
+          }
+          const conversationList = document.getElementById("conversationList");
+          ConversationsData.forEach((conversation) => {
+            const li = document.createElement("li");
+            const a = document.createElement("a");
+
+            const conversation_id = conversation.id ? conversation.id : 0;
+
+            a.href = "{% url 'conversation' conversation_id=0 %}".replace(
+              "/0/",
+              "/" + conversation_id + "/"
+            );
+            a.textContent = conversation.title;
+            a.classList.add("p-4", "ml-4");
+            li.appendChild(a);
+            conversationList.appendChild(li);
+            li.classList.add(
+              "list-group-item",
+              "d-flex",
+              "justify-content-between",
+              "align-items-center",
+              "cursor-pointer",
+              "gap-4",
+              "p-4"
+            );
+          });
+        })
+        .catch((ConversationsError) => {
+          console.log("ConversationsError", ConversationsError);
+        });
+    </script>
+  </body>
+</html>

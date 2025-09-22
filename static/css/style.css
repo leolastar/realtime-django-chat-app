@@ -1,0 +1,25 @@
+/* Style the paragraph tags wrapping each field */
+.form-container p {
+  margin-bottom: 15px;
+  padding: 5px;
+  border-bottom: 1px solid #eee;
+}
+
+/* Style the labels */
+.form-container label {
+  display: block; /* Make labels appear on their own line */
+  font-weight: bold;
+  margin-bottom: 5px;
+  color: #333;
+}
+
+/* Style the input fields */
+.form-container input[type="text"],
+.form-container input[type="email"],
+.form-container textarea {
+  width: 100%;
+  padding: 8px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  box-sizing: border-box; /* Include padding and border in the element's total width and height */
+}
