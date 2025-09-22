@@ -48,6 +48,7 @@ INSTALLED_APPS = [
     'django_prometheus',
     'corsheaders',
     'chat',
+    'django_redis',
 ]
 
 MIDDLEWARE = [
@@ -88,7 +89,7 @@ CHANNEL_LAYERS = {
     "default":{
         "BACKEND":"channels_redis.core.RedisChannelLayer",
         "CONFIG":{
-            "hosts":[(os.getenv('REDIS_HOST', 'redis'),6379)]
+            "hosts":[(os.getenv('REDIS_HOST', '0.0.0.0'),6379)]
         }
     }
 }
@@ -168,12 +169,12 @@ SIMPLE_JWT = {
     "AUTH_HEADER_TYPES": ("Bearer",),
 }
 
-# CACHES = {
-#     "default": {
-#         "BACKEND": "django_redis.cache.RedisCache",
-#         "LOCATION": "redis://redis:6379/1",  # Adjust Redis URL as needed
-#         "OPTIONS": {
-#             "CLIENT_CLASS": "django_redis.client.DefaultClient",
-#         }
-#     }
-# }
+CACHES = {
+    "default": {
+        "BACKEND": "django_redis.cache.RedisCache",
+        "LOCATION": f"redis://{os.getenv('REDIS_HOST', '0.0.0.0')}:6379/1",  
+        "OPTIONS": {
+            "CLIENT_CLASS": "django_redis.client.DefaultClient",
+        }
+    }
+}

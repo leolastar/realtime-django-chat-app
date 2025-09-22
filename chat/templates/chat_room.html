@@ -32,13 +32,20 @@
 
       socket.onmessage = function (e) {
         const data = JSON.parse(e.data);
+        console.log("chat_room.html data", data);
 
         if (data.type === "chat.join") {
+          const chatBox = document.getElementById("chat-box");
           if (data.message.user_id === parseInt(user_id)) {
+            const messages = JSON.parse(data.messages);
+            console.log("chat_room.html messages", messages);
+            messages.forEach((msg) => {
+              chatBox.innerHTML += `<div class="mb-1"><strong>${msg.user}:</strong> ${msg.message}</div>`;
+            });
+            chatBox.scrollTop = chatBox.scrollHeight;
             return;
           }
           const msg = data.message;
-          const chatBox = document.getElementById("chat-box");
           chatBox.innerHTML += `<div class="mb-1"><strong>${msg.user}:</strong> joined the chat</div>`;
           chatBox.scrollTop = chatBox.scrollHeight;
           document.getElementById("typing-indicator").innerText = "";

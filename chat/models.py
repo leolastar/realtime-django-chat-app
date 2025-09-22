@@ -3,7 +3,6 @@ from django.contrib.auth.models import AbstractBaseUser, PermissionsMixin, BaseU
 from django.contrib.auth import get_user_model
 User = get_user_model()
 
-# ---- Conversation & Message models (stored in Postgres) ----
 class Conversation(models.Model):
     owner = models.ForeignKey(User, on_delete=models.CASCADE, related_name="owned_conversations")
     title = models.CharField(max_length=255, blank=True, null=True)

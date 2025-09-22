@@ -16,9 +16,5 @@ urlpatterns = [
     path("api/users/", chat_views.get_all_users, name="api_get_all_users"),
     path("api/conversations/", chat_views.conversation_list, name="api_conversations"),
     path("api/conversations/create/", chat_views.create_conversation, name="api_create_conv"),
-    path("api/conversations/<int:conversation_id>/", chat_views.conversation_detail, name="api_conv_detail"),
-    path("api/conversations/<int:conversation_id>/send/", chat_views.send_message, name="api_send_message"),
-    path("api/conversations/<int:conversation_id>/typing/", chat_views.typing, name="api_typing"),
-    path("api/conversations/<int:conversation_id>/stop_typing/", chat_views.stop_typing, name="api_stop_typing"),
 ] 
 urlpatterns += static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)

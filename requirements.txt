@@ -17,3 +17,4 @@ uvicorn[standard]
 websockets
 wsproto
 whitenoise
+django_redis

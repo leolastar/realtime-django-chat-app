@@ -14,16 +14,17 @@ from rest_framework import status, permissions
 from .models import User, Conversation, Message, ConversationParticipant
 from .serializers import UserSerializer, ConversationSerializer, MessageSerializer, ConversationParticipantSerializer, ConversationCreateSerializer
 from .forms import SignUpForm
-from .signals import typing_signal, stop_typing_signal
 
 
 logger = logging.getLogger(__name__)
 
 # ---------- Front‑end Views ----------
 def home(request):  
+    logger.info("home request", request)
     return render(request, "home.html")
 
 def signup(request):
+    logger.info("signup request", request)
     if request.method == "POST":
         form = SignUpForm(request.POST)
         if form.is_valid():
@@ -35,6 +36,7 @@ def signup(request):
     return render(request, "signup.html", {"form": form})
 
 def login_view(request):
+    logger.info("login_view request", request)
     if request.method == "POST":
         raw_body = request.body
         decoded_body = raw_body.decode('utf-8')
@@ -59,6 +61,7 @@ def login_view(request):
     return render(request, "login.html")
 
 def logout_view(request):
+    logger.info("logout_view request", request)
     logout(request)
     response = redirect("home")
     response.delete_cookie("access_token")
@@ -66,15 +69,17 @@ def logout_view(request):
     return response
 
 def chat(request):
+    logger.info("chat request", request)
     return render(request, "chat_list.html")
 
 # ---------- API Views ----------
 def user_detail(request):
-    permission_classes = [IsAuthenticated]
+    logger.info("user_detail request", request)
     serializer = UserSerializer(request.user)
     return Response(serializer.data)
 
 def get_all_users(request):
+    logger.info("get_all_users request", request)
     users = User.objects.all()
     serializer = UserSerializer(users, many=True)   
     return JsonResponse(serializer.data, safe=False, status=status.HTTP_200_OK)
@@ -83,32 +88,30 @@ def get_all_users(request):
 def conversation_list(request):
     """Return list of conversations for the logged‑in user."""
     if request.method == "POST":
+        logger.info("conversation_list request", request)
         conversations = []
         raw_body = request.body
         decoded_body = raw_body.decode('utf-8')
         data = json.loads(decoded_body)
         user_id = data.get("user_id")
         user = User.objects.get(id=user_id)
-        print("conversation_list", user)
+ 
         conversations_participants = ConversationParticipant.objects.filter(user=user) 
-        print("conversations_participants", conversations_participants)
 
         for conversation in conversations_participants:
-            print("conversation", conversation)
-            conversation_instance = Conversation.objects.get(id=conversation.conversation.id)
-            print("conversation_instance", conversation_instance)
+            conversation_instance = Conversation.objects.get(id=conversation.conversation.id)   
             conversation_serializer = ConversationSerializer(conversation_instance)
-            print("conversation_serializer", conversation_serializer.data)
             conversations.append(conversation_serializer.data)
-        print("conversations", conversations)
+
         serializer = ConversationSerializer(conversations, many=True)
-        print("serializer.data", serializer.data)
+
         return JsonResponse(serializer.data, safe=False, status=status.HTTP_200_OK)
 
 
 def create_conversation(request):
     """Create a conversation with the supplied participants."""
     if request.method == "POST":
+        logger.info("create_conversation request", request)
         raw_body = request.body
         decoded_body = raw_body.decode('utf-8')
         data = json.loads(decoded_body)
@@ -128,73 +131,32 @@ def create_conversation(request):
             conversation_participants = conversation_participants.split(",")
             conversation_participants = [User.objects.get(email=participant) for participant in conversation_participants]
             conversation_participants.append(user)
-            print("create_conversation conversation_participants", conversation_participants)
+
             for participant in conversation_participants:
                 conversation_instance = Conversation.objects.get(id=conversation_id)
-                print("create_conversation conversation_instance", conversation_instance)
                 user_instance = User.objects.get(id=participant.id)
-                print("create_conversation user_instance", user_instance)
+
                 conversation_participant_data = {
                     "conversation": ConversationSerializer(conversation_instance).data,
                     "user": UserSerializer(user_instance).data,
                 }
-                print("create_conversation conversation_participant_data", conversation_participant_data)
                 conversation_participant_serializer = ConversationParticipantSerializer(data=conversation_participant_data)
-                print("create_conversation conversation_participant_serializer", conversation_participant_serializer.is_valid())
+
                 if conversation_participant_serializer.is_valid():
-                    conversation_participant_serializer.save()
-                    print("create_conversation conversation_participant_serializer saved")
+                    conversation_participant_serializer.save() 
                 else:
-                    print("create_conversation conversation_participant_serializer errors", conversation_participant_serializer.errors)
+                    logger.error("create_conversation conversation_participant_serializer errors", conversation_participant_serializer.errors)
             
             return JsonResponse(conversation_serializer.data, safe=False, status=status.HTTP_201_CREATED)
         return JsonResponse(conversation_serializer.errors, safe=False, status=status.HTTP_400_BAD_REQUEST)
 
 
 def conversation_detail(request, conversation_id):
-    print("conversation_detail conversation_id", conversation_id)
-    print("conversation_detail conversation_id", conversation_id)
+    logger.info("conversation_detail request", request)
     conv = Conversation.objects.get(id=conversation_id)
-    print("conversation_detail conv", conv)
     serializer = ConversationSerializer(conv)
-    print("conversation_detail serializer", serializer.data)
     return render(request, "chat_room.html", {"conversation": serializer.data})    
 
 
-def send_message(request, conv_id):
-    """
-    POST body: {"content": "Hello"}
-    Throttle: 1 request per second per user (custom throttle class)
-    """
-    conv = Conversation.objects.get(id=conv_id)
-    if request.user not in conv.conversation_participants.all():
-        return HttpResponseForbidden("Not a participant.")
-    content = request.data.get("content", "").strip()
-    if not content:
-        return Response({"detail": "Empty content."}, status=status.HTTP_400_BAD_REQUEST)
-
-    message = Message.objects.create(conversation=conv, sender=request.user, content=content)
-    serializer = MessageSerializer(message)
-    # Publish to Redis channel for real‑time
-    channel_name = f"conversation_{conv.id}"
-    message_data = serializer.data
-    # Use Django Redis cache as pub/sub
-    from django.core.cache import cache
-    cache.publish(channel_name, json.dumps(message_data))
-    return Response(serializer.data, status=status.HTTP_201_CREATED)
-
-# ---------- Typing Indicator ----------
-def typing(request, conv_id):
-    conv = Conversation.objects.get(id=conv_id)
-    if request.user not in conv.participants.all():
-        return HttpResponseForbidden()
-    typing_signal(conv.id, request.user.id)
-    return Response(status=status.HTTP_204_NO_CONTENT)
 
 
-def stop_typing(request, conv_id):
-    conv = Conversation.objects.get(id=conv_id)
-    if request.user not in conv.participants.all():
-        return HttpResponseForbidden()
-    stop_typing_signal(conv.id, request.user.id)
-    return Response(status=status.HTTP_204_NO_CONTENT)
