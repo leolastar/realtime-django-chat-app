@@ -29,25 +29,43 @@
 git clone
 cd
 
-# Run Locally
-
-# 1. Install dependencies
-pip install -r requirements-dev.txt
-
-# 2. Run migrations & create superuser
-python manage.py migrate
-python manage.py createsuperuser
-
-# 3. Run the dev server
-python manage.py runserver
-
 # Run it in docker locally
 
 # 1. start application
 cp .env.example .env
+# add all the missing values with your own prefered values
+
+# future work will be to add the migration during docker compose
+
+# as of now update the database values and set
+
+# HOST on line 107 for localhost
+
+# 1 start the application with docker compose
 docker compose up --build
+
+# or
+
+docker compose up --build -d
 
 # 2. Run migrations & create superuser
 python manage.py migrate
 python manage.py createsuperuser
+
+# 3 stope the application
+docker compose down
+
+# 4 update the HOST value on line 107 back to database
+
+# 5 rstart the application
+docker compose up --build
+
+# or
+
+docker compose up --build -d
+
+# 6 start using the application  on locahost:8000
+
+
+# happy chating
 ```
