@@ -4,7 +4,6 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-
 class UserSerializer(serializers.ModelSerializer):
     id = serializers.IntegerField(read_only=False)
     class Meta:

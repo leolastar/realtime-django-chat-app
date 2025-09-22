@@ -4,11 +4,17 @@ from chat.consumers import ChatConsumer
 from django.test import override_settings
 from channels.layers import get_channel_layer
 import asyncio
+from django.urls import path
+from channels.routing import URLRouter
+
+application = URLRouter([
+    path("ws/chat/<room_name>/", ChatConsumer.as_asgi()),
+])
 
 @pytest.mark.asyncio
 @override_settings(CHANNEL_LAYERS={"default": {"BACKEND": "channels.layers.InMemoryChannelLayer"}})
 async def test_websocket_connection():
-    communicator = WebsocketCommunicator(ChatConsumer.as_asgi(), "/ws/chat/")
+    communicator = WebsocketCommunicator(application, "/ws/chat/test_conversation_id")
     connected, _ = await communicator.connect()
     assert connected
     await communicator.disconnect()
@@ -16,15 +22,15 @@ async def test_websocket_connection():
 @pytest.mark.asyncio
 @override_settings(CHANNEL_LAYERS={"default": {"BACKEND": "channels.layers.InMemoryChannelLayer"}})
 async def test_receive_message():
-    communicator = WebsocketCommunicator(ChatConsumer.as_asgi(), "/ws/chat/")
+    communicator = WebsocketCommunicator(application, "/ws/chat/test_conversation_id")
     await communicator.connect()
 
     # Send a message to the WebSocket
-    await communicator.send_json_to({"message": "hello"})
+    await communicator.send_json_to({"type": "message", "message": "hello"})
 
     # Receive a message from the WebSocket
     response = await communicator.receive_json_from()
-    assert response == {"message": "hello"}
+    assert response == {"type": "chat.message", "user": "testuser", "message": "hello"}
 
     await communicator.disconnect()
 
@@ -32,8 +38,8 @@ async def test_receive_message():
 @override_settings(CHANNEL_LAYERS={"default": {"BACKEND": "channels.layers.InMemoryChannelLayer"}})
 async def test_broadcast_message():
     channel_layer = get_channel_layer()
-    communicator1 = WebsocketCommunicator(ChatConsumer.as_asgi(), "/ws/chat/")
-    communicator2 = WebsocketCommunicator(ChatConsumer.as_asgi(), "/ws/chat/")
+    communicator1 = WebsocketCommunicator(application, "/ws/chat/test_conversation_id")
+    communicator2 = WebsocketCommunicator(application, "/ws/chat/test_conversation_id")
     await communicator1.connect()
     await communicator2.connect()
 
@@ -42,14 +48,14 @@ async def test_broadcast_message():
         "chat",
         {
             "type": "chat.message",
-            "message": "hello everyone",
+            "message": {"user": "testuser", "message": "hello everyone"},
         }
     )
 
     # Receive the message from both communicators
     response1 = await communicator1.receive_json_from()
     response2 = await communicator2.receive_json_from()
-    assert response1 == {"message": "hello everyone"}
+    assert response1 == {"type": "chat.message", "user": "testuser", "message": "hello everyone"}
     assert response2 == {"message": "hello everyone"}
 
     await communicator1.disconnect()
@@ -58,10 +64,10 @@ async def test_broadcast_message():
 @pytest.mark.asyncio
 @override_settings(CHANNEL_LAYERS={"default": {"BACKEND": "channels.layers.InMemoryChannelLayer"}})
 async def test_disconnect():
-    communicator = WebsocketCommunicator(ChatConsumer.as_asgi(), "/ws/chat/")
+    communicator = WebsocketCommunicator(application, "/ws/chat/test_conversation_id")
     await communicator.connect()
     await communicator.disconnect()
 
     # Try to send a message after disconnect
     with pytest.raises(Exception):
-        await communicator.send_json_to({"message": "should fail"})
+        await communicator.send_json_to({"type": "message", "message": "should fail"})
