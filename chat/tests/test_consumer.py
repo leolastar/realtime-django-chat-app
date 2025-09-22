@@ -3,12 +3,11 @@ from channels.testing import WebsocketCommunicator
 from chat.consumers import ChatConsumer
 from django.test import override_settings
 from channels.layers import get_channel_layer
-import asyncio
-from django.urls import path
+from django.urls import re_path
 from channels.routing import URLRouter
 
 application = URLRouter([
-    path("ws/chat/<room_name>/", ChatConsumer.as_asgi()),
+    re_path(r"ws/chat/(?P<conversation_id>\w+)/$", ChatConsumer.as_asgi()),   
 ])
 
 @pytest.mark.asyncio
